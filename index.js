@@ -27,18 +27,17 @@ app.get("/", async (req, res) => {
             }
         });
 
-        cveIds = cveIds.slice(0, 6);
         const cveDetails = [];
 
         for (const cveId of cveIds) {
             try {
                 const ans = await fetch(`https://cveawg.mitre.org/api/cve/${cveId.cveId}`);
                 const res = await ans.json();
-
                 if (res && res.containers && res.containers.cna && res.containers.cna.metrics && res.containers.cna.metrics.length > 0) {
                     const metric = res.containers.cna.metrics[0];
                     if (metric?.cvssV3_1) {
                         if (metric?.cvssV3_1.version == version) {
+                            console.log("push");
                             cveDetails.push({
                                 date_published: res.cveMetadata.datePublished,
                                 cveId: cveId.cveId,
@@ -90,7 +89,14 @@ app.get("/", async (req, res) => {
                         }
                     }
                     else {
-                        console.log("No CVSS data found");
+                        cveDetails.push({
+                            cveId: cveId.cveId,
+                            cveDesc: cveId.cveDesc,
+                            score: null,
+                            severity: null,
+                            version: null,
+                            vectorString: null
+                        });
                     }
                 }
                 else {

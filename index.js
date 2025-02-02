@@ -73,9 +73,11 @@ async function fetchData(tool) {
                         const productColumn = $(columns[1]).find("a");
                         const vulnColumn = $(columns[3]).find("a");
                         const no_of_vuln = $(columns[3]).text().trim();
+                        const vendor_name = $(columns[2]).find("a");
 
                         const productLink = `https://www.cvedetails.com${productColumn.attr("href")}`;
                         const vulnLink = `https://www.cvedetails.com${vulnColumn.attr("href")}`;
+                        const vendorLink = `https://www.cvedetails.com${vendor_name.attr("href")}`;
 
                         const data1 = [];
 
@@ -100,6 +102,7 @@ async function fetchData(tool) {
                                 product_name: productColumn.text().trim(),
                                 product_link: productLink,
                                 vendor_name: $(columns[2]).text().trim(),
+                                vendor_link: vendorLink,
                                 no_of_vuln: $(columns[3]).text().trim(),
                                 vuln_link: vulnLink,
                                 prd_type: $(columns[4]).text().trim(),
@@ -115,7 +118,7 @@ app.get('/', (req, res) => {
 })
 
 app.get('/api', async (req, res) => {
-        const { tool } = req.body;
+        const { tool } = req.query;
         if (!tool) {
                 return res.status(404).json({ message: "Software name is req." });
         }

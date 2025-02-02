@@ -30,7 +30,7 @@ async function findID(url) {
                                 const innerDivs = $(el).children("div");
 
                                 if (innerDivs.length >= 2) {
-                                        const nestedKey = $(innerDivs[0]).text().trim();
+                                        // const nestedKey = $(innerDivs[0]).text().trim();
 
                                         let nestedValue;
                                         if (i === 0) {
@@ -42,10 +42,10 @@ async function findID(url) {
                                         else {
                                                 nestedValue = $(innerDivs[1]).text().trim();
                                         }
-                                        secondDivData.push({ key: nestedKey, value: nestedValue });
+                                        secondDivData.push(nestedValue);
                                 }
                                 else {
-                                        secondDivData.push({ key: $(innerDivs[0]).text().trim(), value: $(el).text().trim() });
+                                        secondDivData.push($(el).text().trim());
                                 }
                         });
 

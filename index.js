@@ -1,17 +1,61 @@
-import express from "express";
 import * as cheerio from "cheerio";
+import express from "express";
+const app = express();
 const port = process.env.PORT || 8000;
 
-const app = express();
 app.use(express.json());
 
-app.get("/", async (req, res) => {
-    const { tool } = req.body;
-    if (!tool) {
-        return res.status(400).json({ message: "Software aname is required" });
-    }
+async function findID(url) {
+        const response = await fetch(url);
+        const body = await response.text();
+        const $ = cheerio.load(body);
 
-    try {
+        const tableRows = $("#searchresults > div > div");
+        const data = [];
+
+        tableRows.each((index, row) => {
+                const childDivs = $(row).children("div");
+
+                if (childDivs.length >= 2) {
+                        const firstDivChildren = $(childDivs[0]).children("div");
+                        const firstDivData = firstDivChildren.map((i, el) => $(el).text().trim()).get();
+
+                        const secondDivChildren = $(childDivs[1]).children("div");
+
+                        let secondDivData = [];
+                        secondDivChildren.each((i, el) => {
+                                const innerDivs = $(el).children("div");
+
+                                if (innerDivs.length >= 2) {
+                                        const nestedKey = $(innerDivs[0]).text().trim();
+
+                                        let nestedValue;
+                                        if (i === 0) {
+                                                nestedValue = $(innerDivs[1]).children("div").text().trim();
+                                        }
+                                        else if (i === 1) {
+                                                nestedValue = $(innerDivs[1]).children("span").text().trim();
+                                        }
+                                        else {
+                                                nestedValue = $(innerDivs[1]).text().trim();
+                                        }
+                                        secondDivData.push({ key: nestedKey, value: nestedValue });
+                                }
+                                else {
+                                        secondDivData.push({ key: $(innerDivs[0]).text().trim(), value: $(el).text().trim() });
+                                }
+                        });
+
+                        data.push({
+                                firstDiv: firstDivData,
+                                secondDiv: secondDivData
+                        });
+                }
+        });
+        return data;
+}
+
+async function fetchData(tool) {
         const response = await fetch(`https://www.cvedetails.com/product-search.php?vendor_id=0&search=${tool}`);
         const body = await response.text();
         const $ = cheerio.load(body);
@@ -20,143 +64,62 @@ app.get("/", async (req, res) => {
 
         const data = [];
 
-        tableRows.each((index, row) => {
-            const columns = $(row).find("td");
-            if (columns.length >= 6) {
-                const productColumn = $(columns[1]).find("a");
-        
-                data.push({
-                    serial_no: $(columns[0]).text().trim(),
-                    product_name: productColumn.text().trim(), // Extract product name
-                    product_link: `https://www.cvedetails.com${productColumn.attr("href")}`,
-                    vendor_name: $(columns[2]).text().trim(),
-                    no_of_vuln: $(columns[3]).text().trim(),
-                    prd_type: $(columns[4]).text().trim(),
-                });
-            }
-        });
+        for (let row of tableRows) {
+                const columns = $(row).find("td");
+                if (columns.length >= 6) {
+                        const productColumn = $(columns[1]).find("a");
+                        const vulnColumn = $(columns[3]).find("a");
+                        const no_of_vuln = $(columns[3]).text().trim();
 
-        //go to all the product link and in that page extract url of a from $('#pagingt > a)
+                        const productLink = `https://www.cvedetails.com${productColumn.attr("href")}`;
+                        const vulnLink = `https://www.cvedetails.com${vulnColumn.attr("href")}`;
 
+                        const data1 = [];
 
+                        if (no_of_vuln > 0) {
+                                const details = await findID(vulnLink);
+                                const sample = [];
+                                for (let i = 0; i < details.length; i++) {
+                                        const currentDetail = details[i];
+                                        const firstDivData = currentDetail.firstDiv;
+                                        const secondDivData = currentDetail.secondDiv;
 
-        // let cveIds = [];
+                                        const combinedData = {
+                                                firstDiv: firstDivData,
+                                                secondDiv: secondDivData
+                                        };
+                                        sample.push(combinedData);
+                                }
+                                data1.push(sample);
+                        }
+                        data.push({
+                                serial_no: $(columns[0]).text().trim(),
+                                product_name: productColumn.text().trim(),
+                                product_link: productLink,
+                                vendor_name: $(columns[2]).text().trim(),
+                                no_of_vuln: $(columns[3]).text().trim(),
+                                vuln_link: vulnLink,
+                                prd_type: $(columns[4]).text().trim(),
+                                details: data1
+                        });
+                }
+        }
+        return data;
+}
 
-        // tableRows.each((_, row) => {
-        //     const cveId = $(row).find("td").first().text().trim();
-        //     const cveDesc = $(row).find("td").eq(1).text().trim();
-        //     if (cveId.startsWith("CVE-")) {
-        //         cveIds.push({ cveId, cveDesc });
-        //     }
-        // });
+app.get('/', (req, res) => {
+        return res.status(200).json({ message: "Server is Live" })
+})
 
-        return res.json('done');
+app.get('/api', async (req, res) => {
+        const { tool } = req.body;
+        if (!tool) {
+                return res.status(404).json({ message: "Software name is req." });
+        }
+        const data = await fetchData(tool);
+        return res.status(200).json(data)
+})
 
-        // const cveDetails = [];
-
-        // for (const cveId of cveIds) {
-        //     try {
-        //         const ans = await fetch(`https://cveawg.mitre.org/api/cve/${cveId.cveId}`);
-        //         const res = await ans.json();
-        //         if (res && res.containers && res.containers.cna && res.containers.cna.metrics && res.containers.cna.metrics.length > 0) {
-        //             const metric = res.containers.cna.metrics[0];
-        //             if (metric?.cvssV3_1) {
-        //                 if (metric?.cvssV3_1.version == version) {
-        //                     console.log("push");
-        //                     cveDetails.push({
-        //                         date_published: res.cveMetadata.datePublished,
-        //                         cveId: cveId.cveId,
-        //                         cveDesc: cveId.cveDesc,
-        //                         score: metric ? metric.cvssV3_1.baseScore : null,
-        //                         severity: metric ? metric.cvssV3_1.baseSeverity : null,
-        //                         version: metric ? metric.cvssV3_1.version : null,
-        //                         vectorString: metric ? metric.cvssV3_1.vectorString : null
-        //                     });
-        //                 }
-        //             }
-        //             else if (metric?.cvssV4_0) {
-        //                 if (metric?.cvssV4_0.version === version) {
-        //                     cveDetails.push({
-        //                         date_published: res.cveMetadata.datePublished,
-        //                         cveId: cveId.cveId,
-        //                         cveDesc: cveId.cveDesc,
-        //                         score: metric ? metric.cvssV4_0.baseScore : null,
-        //                         severity: metric ? metric.cvssV4_0.baseSeverity : null,
-        //                         version: metric ? metric.cvssV4_0.version : null,
-        //                         vectorString: metric ? metric.cvssV4_0.vectorString : null
-        //                     });
-        //                 }
-        //             }
-        //             else if (metric?.cvssV3_0) {
-        //                 if (metric?.cvssV3_0.version === version) {
-        //                     cveDetails.push({
-        //                         date_published: res.cveMetadata.datePublished,
-        //                         cveId: cveId.cveId,
-        //                         cveDesc: cveId.cveDesc,
-        //                         score: metric ? metric.cvssV3_0.baseScore : null,
-        //                         severity: metric ? metric.cvssV3_0.baseSeverity : null,
-        //                         version: metric ? metric.cvssV3_0.version : null,
-        //                         vectorString: metric ? metric.cvssV3_0.vectorString : null
-        //                     });
-        //                 }
-        //             }
-        //             else if (metric?.cvssV2_0) {
-        //                 if (metric?.cvssV2_0.version === version) {
-        //                     cveDetails.push({
-        //                         date_published: res.cveMetadata.datePublished,
-        //                         cveId: cveId.cveId,
-        //                         cveDesc: cveId.cveDesc,
-        //                         score: metric ? metric.cvssV2_0.baseScore : null,
-        //                         severity: metric ? metric.cvssV2_0.baseSeverity : null,
-        //                         version: metric ? metric.cvssV2_0.version : null,
-        //                         vectorString: metric ? metric.cvssV2_0.vectorString : null
-        //                     });
-        //                 }
-        //             }
-        //             else {
-        //                 cveDetails.push({
-        //                     cveId: cveId.cveId,
-        //                     cveDesc: cveId.cveDesc,
-        //                     score: null,
-        //                     severity: null,
-        //                     version: null,
-        //                     vectorString: null
-        //                 });
-        //             }
-        //         }
-        //         else {
-        //             cveDetails.push({
-        //                 cveId: cveId.cveId,
-        //                 cveDesc: cveId.cveDesc,
-        //                 score: null,
-        //                 severity: null,
-        //                 version: null,
-        //                 vectorString: null
-        //             });
-        //         }
-        //     } catch (error) {
-        //         console.error(`Error fetching details for ${cveId.cveId}:`, error.message);
-        //         cveDetails.push({
-        //             cveId: cveId.cveId,
-        //             cveDesc: cveId.cveDesc,
-        //             score: null,
-        //             severity: null,
-        //             version: null,
-        //             vectorString: null
-        //         });
-        //     }
-        // }
-
-        // if (cveDetails.length === 0) {
-        //     return res.status(404).json({ message: `No data found for ${tool} version ${version}` });
-        // }
-        // return res.status(200).json(cveDetails);
-
-    } catch (error) {
-        console.error("Error:", error);
-    }
-});
-
-app.listen(port, async () => {
-    console.log(`Server is running on port ${port}`);
-});
+app.listen(port,()=>{
+        console.log(`Server is listening at Port ${port}`);
+})

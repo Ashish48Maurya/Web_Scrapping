@@ -119,7 +119,7 @@ async function findbyCvvId(url) {
                         foot.push(cellData);
                 }
         });
-        console.log(head, foot);
+        return { head, foot }
 }
 
 
@@ -339,6 +339,24 @@ app.get('/api/version', async (req, res) => {
                 return res.status(200).json({
                         tableRow,
                         tableColumn,
+                });
+
+        } catch (error) {
+                console.log(error.message);
+                return res.status(500).json({ message: "Internal server error" });
+        }
+})
+
+app.get('/api/cvvid', async (req, res) => {
+        const { link } = req.query;
+        if (!link) {
+                return res.status(404).json({ message: "link is required." });
+        }
+        try {
+                const { head, foot } = await findbyCvvId(link);
+
+                return res.status(200).json({
+                        head, foot
                 });
 
         } catch (error) {

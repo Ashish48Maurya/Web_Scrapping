@@ -8,7 +8,7 @@ const port = process.env.PORT || 8000;
 app.use(cors())
 app.use(express.json());
 
-async function findID(url) {
+async function findID(url) { //retrn vuln
         const response = await fetch(url);
         const body = await response.text();
         const $ = cheerio.load(body);
@@ -46,7 +46,7 @@ async function findID(url) {
                                 const text = $(el).text().trim();
                                 const href = $(el).find('a').attr('href');
 
-                                return { text, href:`https://www.cvedetails.com${href}`}
+                                return { text, href: `https://www.cvedetails.com${href}` }
                         }).get();
 
                         const secondDivChildren = $(childDivs[1]).children("div");
@@ -99,6 +99,30 @@ async function findID(url) {
         return data1
 }
 
+async function findbyCvvId(url) {
+        const response = await fetch(url);
+        const body = await response.text();
+        const $ = cheerio.load(body);
+
+        let head = [];
+        const tableHead = $('#contentdiv > div > main > div:nth-child(5) > div > table > thead > tr > th');
+        tableHead.each((idx, col) => {
+                const cellData = $(col).text().trim();
+                head.push(cellData);
+        });
+
+        let foot = [];
+        const tableBody = $('#contentdiv > div > main > div:nth-child(5) > div > table > tbody > tr > td');
+        tableBody.each((idx, col) => {
+                if (tableBody.length - 1 > idx) {
+                        const cellData = $(col).text().trim();
+                        foot.push(cellData);
+                }
+        });
+        console.log(head, foot);
+}
+
+
 async function fetchData(tool) {
         const response = await fetch(`https://www.cvedetails.com/product-search.php?vendor_id=0&search=${tool}`);
         const body = await response.text();
@@ -135,7 +159,8 @@ async function fetchData(tool) {
         return data;
 }
 
-async function fetchVendor(url) {
+
+async function fetchVendor(url) { //table thing
         const response = await fetch(url);
         const body = await response.text();
         const $ = cheerio.load(body);
@@ -165,8 +190,6 @@ async function fetchVendor(url) {
 
                 table1Column.push(rowData);
         });
-
-
 
 
         let table2Row = [];
@@ -200,6 +223,7 @@ async function fetchVendor(url) {
 }
 
 
+
 async function fetchVersion(url) {
         const response = await fetch(url);
         const body = await response.text();
@@ -216,19 +240,23 @@ async function fetchVersion(url) {
 
         let tableRow = [];
         let tableColumn = [];
+        let isFirstIteration = true;
         for (const uri of Urls) {
                 const response = await fetch(uri);
                 const body = await response.text();
                 const $ = cheerio.load(body);
 
-                const table1Rows = $('#contentdiv > div > main > div.table-responsive > table > thead > tr')
-                table1Rows.each((idx, row) => {
-                        const ths = $(row).find("th");
-                        ths.each((idx, col) => {
-                                const data = $(col).text().trim();
-                                tableRow.push(data);
+                if (isFirstIteration) {
+                        const table1Rows = $('#contentdiv > div > main > div.table-responsive > table > thead > tr');
+                        table1Rows.each((idx, row) => {
+                                const ths = $(row).find("th");
+                                ths.each((idx, col) => {
+                                        const data = $(col).text().trim();
+                                        tableRow.push(data); 
+                                });
                         });
-                })
+                        isFirstIteration = false; 
+                }
 
                 const table1Cols = $('#contentdiv > div > main > div.table-responsive > table > tbody > tr')
                 table1Cols.each((idx, row) => {
@@ -305,7 +333,6 @@ app.get('/api/version', async (req, res) => {
         if (!link) {
                 return res.status(404).json({ message: "link is required." });
         }
-
         try {
                 const { tableRow, tableColumn } = await fetchVersion(link);
 
@@ -322,5 +349,6 @@ app.get('/api/version', async (req, res) => {
 
 
 app.listen(port, async () => {
+        // await findbyCvvId("https://www.cvedetails.com/cve/CVE-2025-0762/")
         console.log(`Server is listening at Port ${port}`);
 })

@@ -112,13 +112,20 @@ async function findbyCvvId(url) {
         });
 
         let foot = [];
-        const tableBody = $('#contentdiv > div > main > div:nth-child(5) > div > table > tbody > tr > td');
-        tableBody.each((idx, col) => {
-                if (tableBody.length - 1 > idx) {
-                        const cellData = $(col).text().trim();
-                        foot.push(cellData);
-                }
+        const tableBody = $('#contentdiv > div > main > div:nth-child(5) > div > table > tbody > tr');
+
+        tableBody.each((rowIdx, row) => {
+                let rowData = [];
+
+                const tds = $(row).find('td');  // Find all td elements in the row
+                tds.each((tdIdx, col) => {
+                        const cellData = $(col).text().trim();  // Extract text content and trim it
+                        rowData.push(cellData);  // Push the data to rowData array
+                });
+
+                foot.push(rowData);  // Push the rowData array to foot
         });
+
         return { head, foot }
 }
 
@@ -252,10 +259,10 @@ async function fetchVersion(url) {
                                 const ths = $(row).find("th");
                                 ths.each((idx, col) => {
                                         const data = $(col).text().trim();
-                                        tableRow.push(data); 
+                                        tableRow.push(data);
                                 });
                         });
-                        isFirstIteration = false; 
+                        isFirstIteration = false;
                 }
 
                 const table1Cols = $('#contentdiv > div > main > div.table-responsive > table > tbody > tr')
@@ -291,8 +298,14 @@ app.get('/api/tool', async (req, res) => {
         if (!tool) {
                 return res.status(404).json({ message: "Software name is req." });
         }
-        const data = await fetchData(tool);
-        return res.status(200).json(data)
+        try {
+
+                const data = await fetchData(tool);
+                return res.status(200).json(data)
+        } catch (error) {
+                console.error("Error fetching vendor data:", error);
+                return res.status(500).json({ message: "Internal server error" });
+        }
 })
 
 app.get('/api/vuln', async (req, res) => {
@@ -301,10 +314,16 @@ app.get('/api/vuln', async (req, res) => {
                 return res.status(404).json({ message: "link is req." });
         }
         let data = [];
-        if (no_of_vuln > 0) {
-                data = await findID(link);
+        try {
+                if (no_of_vuln > 0) {
+                        data = await findID(link);
+                }
+                return res.status(200).json(data)
         }
-        return res.status(200).json(data)
+        catch (error) {
+                console.error("Error fetching vendor data:", error);
+                return res.status(500).json({ message: "Internal server error" });
+        }
 })
 app.get('/api/vendor', async (req, res) => {
         const { link } = req.query;

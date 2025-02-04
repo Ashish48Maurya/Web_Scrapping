@@ -245,6 +245,10 @@ async function fetchVersion(url) {
                 }
         });
 
+        if(Urls.length === 0){
+                Urls.push(url);
+        }
+
         let tableRow = [];
         let tableColumn = [];
         let isFirstIteration = true;
@@ -285,7 +289,6 @@ async function fetchVersion(url) {
                 });
 
         }
-
         return { tableRow, tableColumn }
 }
 
@@ -386,6 +389,5 @@ app.get('/api/cvvid', async (req, res) => {
 
 
 app.listen(port, async () => {
-        // await findbyCvvId("https://www.cvedetails.com/cve/CVE-2025-0762/")
         console.log(`Server is listening at Port ${port}`);
 })
